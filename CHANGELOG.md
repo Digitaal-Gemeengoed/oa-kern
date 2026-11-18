@@ -1,5 +1,10 @@
 # Wijzigingen
 
+## 0.9.0 — 2026-11-18
+
+- Module `toegankelijkheid`: `herstelAlles` herstelt alle herstelbare bevindingen in één keer. Het document wordt één keer gelezen, alle wijzigingen gaan erin, en de delen worden van achter naar voren vervangen, zodat een vervangen of verwijderd element de plekken ervoor niet verschuift. Een bevinding binnen of rond een andere wacht op een volgende ronde (`uitgesteld`). Zonder segmentvermogen gaat het hele document één keer heen en weer.
+- `herstelbaar`: een bevinding met een vervanging, of met een vraag die al beantwoord is. Een lege alternatieve tekst (versiering) alleen per bevinding.
+
 ## 0.8.0 — 2026-11-10
 
 - Module `classificeren`: `suggesties` (de assistent stelt drie klassen voor op grond van de woorden in het stuk; omschrijving en procestype tellen zwaarder dan de toelichting), `zoek` (op nummer of woord) en `legVast`.

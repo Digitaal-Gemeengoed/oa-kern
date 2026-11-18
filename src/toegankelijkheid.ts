@@ -31,6 +31,11 @@ export function zoekElement(doc: Document, pad: string): Element | null {
 /** Past een wijziging toe op het element op een plek; geeft het nieuwe element en document terug. */
 export function pasToe(parser: Parser, html: string, plek: Plek, w: Wijziging): { element: string; document: string } {
   const doc = parser(html);
+  return { element: pasToeOp(doc, plek, w), document: doc.body.innerHTML };
+}
+
+/** Past een wijziging toe in een geparst document; geeft het nieuwe element terug. */
+function pasToeOp(doc: Document, plek: Plek, w: Wijziging): string {
   const e = zoekElement(doc, plek.pad);
   if (!e) throw new Error(`Het element op ${plek.beschrijving} is niet meer gevonden. Beoordeel opnieuw.`);
   let nieuw: string;
@@ -44,7 +49,7 @@ export function pasToe(parser: Parser, html: string, plek: Plek, w: Wijziging): 
     e.textContent = w.waarde;
     nieuw = e.outerHTML;
   }
-  return { element: nieuw, document: doc.body.innerHTML };
+  return nieuw;
 }
 
 /** Wat een voorstel concreet wijzigt, met het antwoord van de medewerker als het een vraag stelt. */
@@ -111,4 +116,60 @@ export async function herstel(adapter: Adapter, b: Bevinding, antwoord: string |
   }
   await adapter.vervangInhoud({ ...inhoud, data: r.document });
   return { terugval: "Deze werkomgeving kan geen deel van het document vervangen. Het document is opnieuw geladen." };
+}
+
+/**
+ * Kan "Alles herstellen" deze bevinding meenemen? Ja als er een vervanging
+ * is, of een vraag die de medewerker al heeft beantwoord. Een lege
+ * alternatieve tekst (versiering) alleen per bevinding, bewust.
+ */
+export function herstelbaar(b: Bevinding, antwoord?: string): boolean {
+  if (!b.plek?.pad || !b.voorstel) return false;
+  return !!b.voorstel.vervanging || (!!b.voorstel.vraag && !!antwoord?.trim());
+}
+
+const indices = (pad: string) => pad.split("/").slice(1).map(Number);
+const binnen = (ouder: string, kind: string) => kind.startsWith(ouder + "/");
+
+export interface UitkomstAlles extends Uitkomst {
+  hersteld: Bevinding[];
+  /** Ligt binnen of rond een andere bevinding: na opnieuw beoordelen nog eens. */
+  uitgesteld: Bevinding[];
+}
+
+/**
+ * Herstelt alle herstelbare bevindingen in één keer. Eén document, alle
+ * wijzigingen erin; daarna per deel vervangen van achter naar voren, zodat
+ * een verwijderd of vervangen element de plekken ervóór niet verschuift.
+ * Bevindingen die binnen of rond een andere liggen, wachten op een volgende
+ * ronde: de vervanging van het ouderelement is gemaakt op de oude inhoud.
+ */
+export async function herstelAlles(adapter: Adapter, bevindingen: Bevinding[], antwoorden: Record<string, string> = {}, parser: Parser = browserParser): Promise<UitkomstAlles> {
+  const kandidaten = bevindingen.filter((b) => herstelbaar(b, antwoorden[b.id]));
+  // Per plek één wijziging; binnen een ander element: de diepste eerst, de ouder later.
+  const gekozen: Bevinding[] = [];
+  const uitgesteld: Bevinding[] = [];
+  for (const b of [...kandidaten].sort((x, y) => indices(y.plek!.pad).length - indices(x.plek!.pad).length)) {
+    const p = b.plek!.pad;
+    if (gekozen.some((g) => g.plek!.pad === p || binnen(p, g.plek!.pad) || binnen(g.plek!.pad, p))) uitgesteld.push(b);
+    else gekozen.push(b);
+  }
+  if (!gekozen.length) return { hersteld: [], uitgesteld };
+  // Van achter naar voren in het document.
+  const volgorde = (x: Bevinding, y: Bevinding) => {
+    const a = indices(x.plek!.pad);
+    const c = indices(y.plek!.pad);
+    for (let i = 0; i < Math.min(a.length, c.length); i++) if (a[i] !== c[i]) return c[i]! - a[i]!;
+    return c.length - a.length;
+  };
+  gekozen.sort(volgorde);
+  const inhoud = await adapter.leverInhoud();
+  const doc = parser(inhoud.data);
+  const nieuw = gekozen.map((b) => ({ b, element: pasToeOp(doc, b.plek!, wijzigingVoor(b, antwoorden[b.id])!) }));
+  if (adapter.vervangSegment && heeftVermogen(adapter.werkomgeving(), "segment-vervangen")) {
+    for (const { b, element } of nieuw) await adapter.vervangSegment(b.plek!, element);
+    return { hersteld: gekozen, uitgesteld };
+  }
+  await adapter.vervangInhoud({ ...inhoud, data: doc.body.innerHTML });
+  return { hersteld: gekozen, uitgesteld, terugval: "Deze werkomgeving kan geen deel van het document vervangen. Het document is opnieuw geladen." };
 }

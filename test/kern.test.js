@@ -90,6 +90,43 @@ test("zonder segmentvermogen valt de assistent zichtbaar terug op het hele docum
   assert.deepEqual(a.log, ["geheel"]);
 });
 
+const bev = (id, pad, voorstel) => ({ id, module: "toegankelijkheid", ernst: "fout", regel: "", melding: "", plek: { pad, beschrijving: id }, voorstel });
+
+test("alles herstellen: één keer lezen, van achter naar voren, vragen alleen met antwoord, ouder en kind niet tegelijk", async () => {
+  const html = '<p><b>Kop</b></p><p><img src="a.png"></p><p><img src="b.png"></p><ul><li><b>x</b></li></ul>';
+  const lijst = [
+    bev("kop", "body/0", { beschrijving: "", vervanging: "<h2>Kop</h2>" }),
+    bev("alt-a", "body/1/0", { beschrijving: "", vraag: { label: "Alt", veld: "alt" } }),
+    bev("alt-b", "body/2/0", { beschrijving: "", vraag: { label: "Alt", veld: "alt" } }), // geen antwoord: blijft staan
+    bev("lijst", "body/3", { beschrijving: "", vervanging: "<ul><li>x</li></ul>" }),
+    bev("vet", "body/3/0/0", { beschrijving: "", vervanging: "<strong>x</strong>" }), // binnen "lijst"
+    bev("info", "body/0", undefined),
+  ];
+  const a = nepAdapter(html);
+  let gelezen = 0;
+  const lees = a.leverInhoud;
+  a.leverInhoud = async () => (gelezen++, lees());
+  const u = await toegankelijkheid.herstelAlles(a, lijst, { "alt-a": "Kaart" }, parser);
+  assert.equal(gelezen, 1);
+  assert.deepEqual(u.hersteld.map((b) => b.id), ["vet", "alt-a", "kop"]);
+  assert.deepEqual(u.uitgesteld.map((b) => b.id), ["lijst"]);
+  assert.deepEqual(a.log.map((r) => r.split(" ").slice(0, 2).join(" ")), ["segment body/3/0/0", "segment body/1/0", "segment body/0"]);
+  assert.match(a.log[1], /alt="Kaart"/);
+  assert.equal(u.terugval, undefined);
+  assert.equal(toegankelijkheid.herstelbaar(lijst[2], "  "), false);
+});
+
+test("alles herstellen zonder segmentvermogen: één keer het hele document", async () => {
+  const a = nepAdapter("<p><b>Kop</b></p><p>tekst</p><p><b>Tweede</b></p>", false);
+  const u = await toegankelijkheid.herstelAlles(a, [
+    bev("1", "body/0", { beschrijving: "", vervanging: "<h2>Kop</h2>" }),
+    bev("2", "body/2", { beschrijving: "", vervanging: "<h2>Tweede</h2>" }),
+  ], {}, parser);
+  assert.match(u.terugval, /opnieuw geladen/);
+  assert.deepEqual(a.log, ["geheel"]);
+  assert.equal(a.data, "<h2>Kop</h2><p>tekst</p><h2>Tweede</h2>");
+});
+
 test("registreren schrijft de afdruk; zonder dat vermogen zegt de assistent het", async () => {
   const object = { identificatie: "11111111-1111-1111-1111-111111111111", objecttype: { naam: "document", versie: 1 }, versies: [{ nummer: 1 }], volgnummer: 2 };
   const verbinding = { maakObject: async () => object, object: async () => object };
