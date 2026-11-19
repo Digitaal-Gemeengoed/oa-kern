@@ -457,3 +457,14 @@ test("de selectielijst als boom: procestype, generiek resultaat, uitwerkingen; o
   // Een procestype zonder klassen in gebruik valt weg.
   assert.equal(classificeren.boom(resultaten.filter((r) => r.procestype !== 5), procestypen).length, 28);
 });
+
+test("eigen zoektermen tellen mee bij zoeken en bij de voorstellen van de assistent", () => {
+  const { resultaten, procestypen } = SELECTIELIJST_2020;
+  const zonder = classificeren.zoek(resultaten, procestypen, "collegevoorstel");
+  assert.equal(zonder.length, 0, "de selectielijst kent het woord niet");
+  const met = resultaten.map((r) => (r.id === "2.1" ? { ...r, zoektermen: ["collegevoorstel"] } : r));
+  assert.deepEqual(classificeren.zoek(met, procestypen, "collegevoorstel").map((r) => r.id), ["2.1"]);
+  const v = classificeren.suggesties("Collegevoorstel over het nieuwe parkeerbeleid", "Collegevoorstel parkeren", met, procestypen);
+  assert.equal(v[0].resultaat.id, "2.1");
+  assert.ok(v[0].woorden.includes("collegevoorstel"));
+});

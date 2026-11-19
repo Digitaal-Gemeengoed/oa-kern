@@ -24,12 +24,13 @@ import {
   type SelectielijstResultaat,
   type Afwijking,
   type Wijzigingsvoorstel,
+  type ZaakClassificatie,
 } from "@digitaalgemeengoed/oa-contract";
 
 /** Het classificatiemodel dat nu geldt, met de resultaten uit de selectielijst die de gemeente gebruikt. */
 export interface ClassificatieAntwoord {
   model: Classificatiemodel | null;
-  selectielijst?: { id: string; naam: string; toelichting: string; procestypen: Procestype[]; resultaten: (SelectielijstResultaat & { afwijking?: Afwijking })[] };
+  selectielijst?: { id: string; naam: string; toelichting: string; procestypen: Procestype[]; resultaten: (SelectielijstResultaat & { afwijking?: Afwijking; zoektermen?: string[] })[] };
 }
 
 export interface ObjectMetStaat extends Informatieobject {
@@ -184,6 +185,10 @@ export class Verbinding {
     return this.vraag<ObjectMetStaat>(VASTLEG.metadata(id), { method: "PUT", body: JSON.stringify({ metadata, verwachteVolgnummer }) });
   }
   /** Met de selectielijst (voor Classificeren), of alleen het model. */
+  /** Hoe andere stukken in dezelfde zaak of hetzelfde dossier zijn geclassificeerd. */
+  zaakclassificatie(id: string) {
+    return this.vraag<ZaakClassificatie | { rol: null; waarde: null; klassen: [] }>(LEES.zaakclassificatie(id));
+  }
   classificatie(alleenModel = false) {
     return this.vraag<ClassificatieAntwoord>(alleenModel ? LEES.classificatiemodel : LEES.classificatie);
   }

@@ -9,7 +9,8 @@ import type { Stand } from "./vastleggen.js";
  * dit later beter, met dezelfde vorm van voorstel.
  */
 
-export type Resultaat = SelectielijstResultaat & { afwijking?: Afwijking };
+/** Een klasse zoals de gemeente haar gebruikt: met haar afwijking en eigen zoektermen. */
+export type Resultaat = SelectielijstResultaat & { afwijking?: Afwijking; zoektermen?: string[] };
 
 export interface Voorstel {
   resultaat: Resultaat;
@@ -30,7 +31,7 @@ export function woordenVan(tekst: string): string[] {
 }
 
 function beschrijving(r: Resultaat, pt?: Procestype): string {
-  return [r.naam, r.omschrijving, r.toelichting, pt?.naam, pt?.procesobject].filter(Boolean).join(" ");
+  return [r.naam, r.omschrijving, r.toelichting, pt?.naam, pt?.procesobject, ...(r.zoektermen ?? [])].filter(Boolean).join(" ");
 }
 
 /**
@@ -47,6 +48,8 @@ function gewogen(r: Resultaat, pt?: Procestype): Map<string, number> {
   voeg(r.naam, 1);
   voeg(pt?.naam, 1.2);
   voeg(r.omschrijving, 2);
+  // De woorden van de gemeente zelf ("collegevoorstel") zeggen het meest.
+  voeg(r.zoektermen?.join(" "), 2.5);
   return uit;
 }
 

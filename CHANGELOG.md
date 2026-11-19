@@ -1,5 +1,11 @@
 # Wijzigingen
 
+## 0.11.0 — 2026-11-19
+
+- `classificeren.zoek` en `classificeren.suggesties` gebruiken de eigen zoektermen van de gemeente; bij de voorstellen tellen ze het zwaarst.
+- `Verbinding.zaakclassificatie(id)`.
+- Hangt af van oa-contract 0.9.0.
+
 ## 0.10.0 — 2026-11-19
 
 - Module `classificeren`: `boom` zet de klassen die de gemeente gebruikt in de indeling van de selectielijst: procestype, generiek resultaat (12.2), uitwerkingen (12.2.3). Een groep blijft bestaan als het generieke resultaat zelf uit staat maar uitwerkingen aan; dan is `zelf` null. Met het aantal klassen per procestype. `opNummer` sorteert op de getallen (3.10 na 3.9).
