@@ -1,5 +1,9 @@
 # Wijzigingen
 
+## 0.12.1 — 2026-11-19
+
+- oa-contract 0.11.0.
+
 ## 0.12.0 — 2026-11-19
 
 - `legVast` en `legClassificatieVast` geven `toetsvragenBevestigd` door (oa-contract 0.10.0).
