@@ -192,7 +192,7 @@ export class Verbinding {
   classificatie(alleenModel = false) {
     return this.vraag<ClassificatieAntwoord>(alleenModel ? LEES.classificatiemodel : LEES.classificatie);
   }
-  legClassificatieVast(id: string, keuze: { resultaat: string; attributen?: Record<string, string | boolean>; einddatumProcesobject?: string }, verwachteVolgnummer?: number) {
+  legClassificatieVast(id: string, keuze: { resultaat: string; attributen?: Record<string, string | boolean>; einddatumProcesobject?: string; toetsvragenBevestigd?: boolean }, verwachteVolgnummer?: number) {
     return this.vraag<ObjectMetStaat>(VASTLEG.classificatie(id), { method: "PUT", body: JSON.stringify({ ...keuze, verwachteVolgnummer }) });
   }
   /** Bij een vergrendeld stuk: de wijziging als voorstel, naast het stuk. */

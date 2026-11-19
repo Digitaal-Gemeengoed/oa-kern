@@ -163,7 +163,7 @@ export function zoek(resultaten: Resultaat[], procestypen: Procestype[], vraag: 
 export async function legVast(
   verbinding: Verbinding,
   stand: Stand,
-  keuze: { resultaat: string; attributen?: Record<string, string | boolean>; einddatumProcesobject?: string },
+  keuze: { resultaat: string; attributen?: Record<string, string | boolean>; einddatumProcesobject?: string; toetsvragenBevestigd?: boolean },
 ): Promise<Stand> {
   if (!stand.object) throw new Error("Het stuk is nog niet geregistreerd.");
   const object: ObjectMetStaat = await verbinding.legClassificatieVast(stand.object.identificatie, keuze, stand.object.volgnummer);
