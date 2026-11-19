@@ -1,5 +1,10 @@
 # Wijzigingen
 
+## 0.10.0 — 2026-11-19
+
+- Module `classificeren`: `boom` zet de klassen die de gemeente gebruikt in de indeling van de selectielijst: procestype, generiek resultaat (12.2), uitwerkingen (12.2.3). Een groep blijft bestaan als het generieke resultaat zelf uit staat maar uitwerkingen aan; dan is `zelf` null. Met het aantal klassen per procestype. `opNummer` sorteert op de getallen (3.10 na 3.9).
+- Typen `Klassegroep` en `Klassetak`.
+
 ## 0.9.0 — 2026-11-18
 
 - Module `toegankelijkheid`: `herstelAlles` herstelt alle herstelbare bevindingen in één keer. Het document wordt één keer gelezen, alle wijzigingen gaan erin, en de delen worden van achter naar voren vervangen, zodat een vervangen of verwijderd element de plekken ervoor niet verschuift. Een bevinding binnen of rond een andere wacht op een volgende ronde (`uitgesteld`). Zonder segmentvermogen gaat het hele document één keer heen en weer.

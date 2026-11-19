@@ -11,5 +11,5 @@ export * as classificeren from "./classificeren.js";
 export type { Bevestigd, Gevonden, PiiKaart, Sessie } from "./anonimiseren.js";
 export * from "./vastleggen.js";
 export type { Veld } from "./metadateren.js";
-export type { Voorstel as Klassevoorstel, Resultaat as Klasse } from "./classificeren.js";
+export type { Voorstel as Klassevoorstel, Resultaat as Klasse, Groep as Klassegroep, Tak as Klassetak } from "./classificeren.js";
 export type { Wijziging, Uitkomst, UitkomstAlles, Parser } from "./toegankelijkheid.js";

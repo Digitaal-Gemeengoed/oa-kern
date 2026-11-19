@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseHTML } from "linkedom";
 import { OBJECTTYPE_DOCUMENT_V1 } from "@digitaalgemeengoed/oa-contract";
-import { metadateren, toegankelijkheid, registreer, bepaalStand } from "../dist/index.js";
+import { metadateren, toegankelijkheid, registreer, bepaalStand, classificeren } from "../dist/index.js";
+import { SELECTIELIJST_2020 } from "@digitaalgemeengoed/oa-contract/selectielijst";
 
 const parser = (html) => parseHTML(`<!doctype html><html><body>${html}</body></html>`).document;
 
@@ -435,4 +436,24 @@ test("classificeren: voorstellen uit de woorden van het stuk; zoeken op nummer o
   assert.deepEqual(classificeren.suggesties("", "", L.resultaten, L.procestypen), []);
   assert.ok(classificeren.zoek(L.resultaten, L.procestypen, "12.2").every((r) => r.id === "12.2" || r.id.startsWith("12.2.")));
   assert.ok(classificeren.zoek(L.resultaten, L.procestypen, "kappen herplant").some((r) => r.id === "11.1.12"));
+});
+
+test("de selectielijst als boom: procestype, generiek resultaat, uitwerkingen; ook als het generieke uitstaat", () => {
+  const { resultaten, procestypen } = SELECTIELIJST_2020;
+  const b = classificeren.boom(resultaten, procestypen);
+  assert.equal(b.length, 29);
+  assert.equal(b.reduce((n, t) => n + t.aantal, 0), resultaten.length, "elke klasse precies één keer");
+  const drie = b.find((t) => t.procestype.nummer === 3);
+  const g31 = drie.groepen.find((g) => g.id === "3.1");
+  assert.equal(g31.zelf.id, "3.1");
+  assert.deepEqual(g31.uitwerkingen.map((r) => r.id).slice(0, 3), ["3.1.1", "3.1.2", "3.1.3"]);
+  // 3.1 uit, 3.1.4 aan: de groep blijft, met de naam van de uitwerking, maar is zelf niet te kiezen.
+  const zonder = classificeren.boom(resultaten.filter((r) => r.id !== "3.1"), procestypen);
+  const g = zonder.find((t) => t.procestype.nummer === 3).groepen.find((x) => x.id === "3.1");
+  assert.equal(g.zelf, null);
+  assert.equal(g.naam, "Vastgesteld");
+  // Op nummer: 1.10 na 1.9.
+  assert.ok(classificeren.opNummer("1.10", "1.9") > 0);
+  // Een procestype zonder klassen in gebruik valt weg.
+  assert.equal(classificeren.boom(resultaten.filter((r) => r.procestype !== 5), procestypen).length, 28);
 });

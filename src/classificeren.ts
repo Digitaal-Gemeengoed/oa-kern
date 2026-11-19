@@ -81,6 +81,68 @@ export function suggesties(tekst: string, titel: string, resultaten: Resultaat[]
     .slice(0, aantal);
 }
 
+/**
+ * De selectielijst als boom, voor kiezen in stappen: procestype, dan het
+ * generieke resultaat (12.2), dan eventueel een specifieke uitwerking
+ * (12.2.3). Alleen wat de gemeente gebruikt. Een groep kan bestaan zonder
+ * dat het generieke resultaat zelf te kiezen is (uitgezet, met uitwerkingen
+ * die aan staan); dan is `zelf` null.
+ */
+export interface Groep {
+  id: string;
+  naam: string;
+  omschrijving: string;
+  zelf: Resultaat | null;
+  uitwerkingen: Resultaat[];
+}
+export interface Tak {
+  procestype: Procestype;
+  groepen: Groep[];
+  /** Het aantal te kiezen klassen in dit procestype. */
+  aantal: number;
+}
+
+/** "3.10" na "3.9": op de getallen, niet op de tekst. */
+export function opNummer(a: string, b: string): number {
+  const x = a.split(".").map(Number);
+  const y = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] ?? -1) - (y[i] ?? -1);
+    if (d) return d;
+  }
+  return 0;
+}
+
+export function boom(resultaten: Resultaat[], procestypen: Procestype[]): Tak[] {
+  const groepen = new Map<string, Groep>();
+  const groep = (id: string): Groep => {
+    let g = groepen.get(id);
+    if (!g) groepen.set(id, (g = { id, naam: "", omschrijving: "", zelf: null, uitwerkingen: [] }));
+    return g;
+  };
+  for (const r of resultaten) {
+    if (r.generiek) groep(r.generiek).uitwerkingen.push(r);
+    else groep(r.id).zelf = r;
+  }
+  for (const g of groepen.values()) {
+    g.naam = g.zelf?.naam ?? g.uitwerkingen[0]?.naam ?? g.id;
+    g.omschrijving = g.zelf?.omschrijving ?? "";
+    g.uitwerkingen.sort((a, b) => opNummer(a.id, b.id));
+  }
+  const perType = new Map<number, Groep[]>();
+  for (const g of groepen.values()) {
+    const nr = (g.zelf ?? g.uitwerkingen[0]!).procestype;
+    perType.set(nr, [...(perType.get(nr) ?? []), g]);
+  }
+  return [...procestypen]
+    .sort((a, b) => a.nummer - b.nummer)
+    .filter((p) => perType.has(p.nummer))
+    .map((p) => {
+      const gs = perType.get(p.nummer)!.sort((a, b) => opNummer(a.id, b.id));
+      return { procestype: p, groepen: gs, aantal: gs.reduce((n, g) => n + (g.zelf ? 1 : 0) + g.uitwerkingen.length, 0) };
+    });
+}
+
 /** Zoeken in de lijst: op nummer ("12.2") of op woorden. */
 export function zoek(resultaten: Resultaat[], procestypen: Procestype[], vraag: string, max = 40): Resultaat[] {
   const q = vraag.trim().toLowerCase();
