@@ -192,6 +192,10 @@ export class Verbinding {
   classificatie(alleenModel = false) {
     return this.vraag<ClassificatieAntwoord>(alleenModel ? LEES.classificatiemodel : LEES.classificatie);
   }
+  /** Een eerdere versie van het model, met de selectielijst: zo toont het paneel een classificatie zoals ze is vastgelegd. */
+  classificatieVersie(versie: number) {
+    return this.vraag<ClassificatieAntwoord>(`${LEES.classificatie}?versie=${encodeURIComponent(String(versie))}`);
+  }
   legClassificatieVast(id: string, keuze: { resultaat: string; attributen?: Record<string, string | boolean>; einddatumProcesobject?: string; toetsvragenBevestigd?: boolean }, verwachteVolgnummer?: number) {
     return this.vraag<ObjectMetStaat>(VASTLEG.classificatie(id), { method: "PUT", body: JSON.stringify({ ...keuze, verwachteVolgnummer }) });
   }
