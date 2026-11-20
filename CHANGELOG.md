@@ -1,5 +1,9 @@
 # Wijzigingen
 
+## 0.12.3 — 2026-11-20
+
+- oa-contract 0.12.0.
+
 ## 0.12.2 — 2026-11-19
 
 - `verbinding.classificatieVersie(n)`: een eerdere versie van het classificatiemodel, met de selectielijst.
