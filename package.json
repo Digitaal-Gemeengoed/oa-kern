@@ -28,9 +28,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/digitaalgemeengoed/oa-kern.git"
+    "url": "git+https://github.com/Digitaal-Gemeengoed/oa-kern.git"
   },
-  "homepage": "https://github.com/digitaalgemeengoed/oa-kern#readme",
+  "homepage": "https://github.com/Digitaal-Gemeengoed/oa-kern#readme",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   }
