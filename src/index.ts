@@ -8,6 +8,7 @@ export * as metadateren from "./metadateren.js";
 export * as toegankelijkheid from "./toegankelijkheid.js";
 export * as anonimiseren from "./anonimiseren.js";
 export * as classificeren from "./classificeren.js";
+export * as eigenschappen from "./eigenschappen.js";
 export type { Bevestigd, Gevonden, PiiKaart, Sessie } from "./anonimiseren.js";
 export * from "./vastleggen.js";
 export type { Veld } from "./metadateren.js";

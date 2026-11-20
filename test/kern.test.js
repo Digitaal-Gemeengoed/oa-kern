@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseHTML } from "linkedom";
 import { OBJECTTYPE_DOCUMENT_V1 } from "@digitaalgemeengoed/oa-contract";
-import { metadateren, toegankelijkheid, registreer, bepaalStand, classificeren } from "../dist/index.js";
+import { metadateren, toegankelijkheid, registreer, bepaalStand, classificeren, eigenschappen as eig } from "../dist/index.js";
 import { SELECTIELIJST_2020 } from "@digitaalgemeengoed/oa-contract/selectielijst";
 
 const parser = (html) => parseHTML(`<!doctype html><html><body>${html}</body></html>`).document;
@@ -467,4 +467,86 @@ test("eigen zoektermen tellen mee bij zoeken en bij de voorstellen van de assist
   const v = classificeren.suggesties("Collegevoorstel over het nieuwe parkeerbeleid", "Collegevoorstel parkeren", met, procestypen);
   assert.equal(v[0].resultaat.id, "2.1");
   assert.ok(v[0].woorden.includes("collegevoorstel"));
+});
+
+/** Een adapter met documenteigenschappen in het geheugen. */
+function eigenschappenAdapter(html, standaard = {}, eigen = {}) {
+  const e = { standaard: { ...standaard }, eigen: { ...eigen } };
+  return {
+    e,
+    werkomgeving: () => ({ id: "e", naam: "E", vermogens: ["inhoud-opleveren", "inhoud-vervangen", "tonen", "eigenschappen-lezen", "standaardeigenschap-schrijven", "eigenschap-schrijven"] }),
+    leverInhoud: async () => ({ formaat: "html", mediaType: "text/html", codering: "tekst", data: html }),
+    vervangInhoud: async () => {},
+    toon: () => {},
+    leesEigenschappen: async () => JSON.parse(JSON.stringify(e)),
+    schrijfStandaardeigenschap: async (n, w) => { e.standaard[n] = w; },
+    schrijfDocumenteigenschap: async (n, w) => { e.eigen[n] = w; },
+  };
+}
+const nepVerbinding = { toegankelijkheid: async () => ({ bevindingen: [{ id: "w1", module: "toegankelijkheid", ernst: "fout", regel: "WCAG 2.1 2.4.2 Paginatitel", melding: "Titel ontbreekt in de documenteigenschappen", bron: "bestand" }], gecontroleerd: [] }) };
+
+test("documenttitel: één regel Titel wordt het herstel; de melding uit het bestand vervalt", async () => {
+  const a = eigenschappenAdapter('<h1 data-oa-stijl="titel">Gespreksverslag Wmo</h1><h1>Aanleiding</h1><h1>Afspraken</h1>');
+  const r = await toegankelijkheid.beoordeel(a, nepVerbinding);
+  assert.deepEqual(r.bevindingen.map((b) => b.id), ["tg-documenttitel"]);
+  const b = r.bevindingen[0];
+  assert.deepEqual(b.voorstel.eigenschap, { naam: "titel", waarde: "Gespreksverslag Wmo" });
+  assert.equal(toegankelijkheid.herstelbaar(b), true);
+  await toegankelijkheid.herstel(a, b, undefined, parser);
+  assert.equal(a.e.standaard.titel, "Gespreksverslag Wmo");
+  // Daarna geen bevinding meer.
+  assert.deepEqual((await toegankelijkheid.beoordeel(a, nepVerbinding)).bevindingen, []);
+});
+
+test("documenttitel: meer regels Titel → eerst opschonen, geen herstel; geen Titel → vragen", async () => {
+  const twee = await toegankelijkheid.beoordeel(eigenschappenAdapter('<h1 data-oa-stijl="titel">A</h1><h1 data-oa-stijl="titel">B</h1>'), nepVerbinding);
+  assert.equal(twee.bevindingen[0].voorstel, undefined);
+  assert.match(twee.bevindingen[0].melding, /ruim die eerst op/);
+  const a = eigenschappenAdapter("<h1>Aanleiding</h1><p>x</p>");
+  const geen = (await toegankelijkheid.beoordeel(a, nepVerbinding)).bevindingen[0];
+  assert.equal(geen.voorstel.vraag.veld, "eigenschap:titel");
+  assert.equal(toegankelijkheid.herstelbaar(geen), false);
+  assert.equal(toegankelijkheid.herstelbaar(geen, "Mijn titel"), true);
+  const uit = await toegankelijkheid.herstelAlles(a, [geen], { [geen.id]: "Mijn titel" }, parser);
+  assert.equal(uit.hersteld.length, 1);
+  assert.equal(a.e.standaard.titel, "Mijn titel");
+  // Een titel in de eigenschappen is genoeg, ook zonder regel Titel.
+  const metTitel = eigenschappenAdapter("<h1>Aanleiding</h1>", { titel: "Verslag" });
+  assert.deepEqual((await toegankelijkheid.beoordeel(metTitel, nepVerbinding)).bevindingen, []);
+});
+
+test("voorstellen uit regel Titel, eigenschappen en inloggen", () => {
+  const html = { formaat: "html", mediaType: "text/html", codering: "tekst", data: '<h1 data-oa-stijl="titel">Wmo-verslag</h1><h1>Aanleiding</h1>' };
+  const e = { standaard: { titel: "Oud sjabloon", trefwoorden: "wmo, huishouden", taal: "nl-NL", auteur: "J. Sjabloon" }, eigen: {} };
+  const s = metadateren.suggesties(html, {}, OBJECTTYPE_DOCUMENT_V1, { eigenschappen: e, wie: { naam: "Erik Hoekstra" } });
+  assert.equal(s.naam, "Wmo-verslag", "de regel Titel gaat voor de eigenschap");
+  const twee = { ...html, data: '<h1 data-oa-stijl="titel">A</h1><h1 data-oa-stijl="titel">B</h1>' };
+  assert.equal(metadateren.suggesties(twee, {}, OBJECTTYPE_DOCUMENT_V1, { eigenschappen: e }).naam, undefined, "twee titels: eerst opschonen");
+  assert.equal(metadateren.suggesties({ ...html, data: "<p>x</p>" }, {}, OBJECTTYPE_DOCUMENT_V1, { eigenschappen: e }).naam, "Oud sjabloon");
+});
+
+test("metadata naar eigenschappen: rollen als standaardeigenschap, de rest onder het label; anonimiseren", async () => {
+  const { eigenschappen } = await import("../dist/index.js");
+  const velden = metadateren.velden(OBJECTTYPE_DOCUMENT_V1);
+  const titel = velden.find((v) => v.rol === "titel");
+  const md = { [titel.naam]: "Wmo Johanna Pietersen-de Groot" };
+  const ander = velden.find((v) => !v.rol && v.soort === "tekst");
+  if (ander) md[ander.naam] = "iets";
+  const uit = eigenschappen.uitMetadata(OBJECTTYPE_DOCUMENT_V1, md);
+  assert.equal(uit.standaard.titel, "Wmo Johanna Pietersen-de Groot");
+  if (ander) assert.equal(uit.eigen[ander.label], "iets");
+  const a = eigenschappenAdapter("", { titel: "Wmo Johanna Pietersen-de Groot", auteur: "Erik Hoekstra" }, { Zaak: "Zaak van Johanna Pietersen-de Groot" });
+  const n = await eigenschappen.anonimiseer(a, [{ van: "Johanna Pietersen-de Groot", naar: "[NAAM-1]" }], eigenschappen.organisatieNaam("haarlem"));
+  assert.equal(n, 3);
+  assert.deepEqual(a.e.standaard, { titel: "Wmo [NAAM-1]", auteur: "Gemeente Haarlem" });
+  assert.equal(a.e.eigen.Zaak, "Zaak van [NAAM-1]");
+});
+
+test("taalcodes gaan tussen metadata en documenteigenschap in de juiste vorm", () => {
+  assert.equal(eig.taalVoorBestand("dut"), "nl");
+  assert.equal(eig.taalVoorBestand("nl"), "nl");
+  assert.equal(eig.taalVoorBestand("xyz"), undefined);
+  assert.equal(eig.taalUitBestand("nl-NL", ["dut", "eng"]), "dut");
+  assert.equal(eig.taalUitBestand("en-GB", ["nl", "en"]), "en");
+  assert.equal(eig.taalUitBestand("fy", ["dut", "eng"]), undefined);
 });

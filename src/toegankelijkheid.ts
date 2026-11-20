@@ -1,5 +1,6 @@
 import { heeftVermogen, type Adapter, type Bevinding, type Inhoud, type Plek } from "@digitaalgemeengoed/oa-contract";
 import type { Verbinding } from "./verbinding.js";
+import * as eigenschappen from "./eigenschappen.js";
 
 export type Wijziging =
   | { soort: "vervang"; html: string }
@@ -86,6 +87,14 @@ export async function beoordeel(adapter: Adapter, verbinding: Verbinding): Promi
     }
   }
   const r = await verbinding.toegankelijkheid(inhoud, undefined, bestand);
+  // De titel in de documenteigenschappen (WCAG 2.4.2): kan de werkomgeving ze
+  // lezen, dan beoordeelt de assistent dat zelf, met een herstel.
+  const eig = await eigenschappen.lees(adapter);
+  if (eig) {
+    r.bevindingen = r.bevindingen.filter((b) => !eigenschappen.isTitelUitBestand(b));
+    const t = eigenschappen.documenttitelBevinding(inhoud, eig, eigenschappen.kanSchrijven(adapter));
+    if (t) r.bevindingen.unshift(t);
+  }
   if (teGroot) {
     r.bevindingen.push({
       id: "tg-te-groot",
@@ -105,6 +114,10 @@ export async function beoordeel(adapter: Adapter, verbinding: Verbinding): Promi
  * en zegt de assistent dat.
  */
 export async function herstel(adapter: Adapter, b: Bevinding, antwoord: string | undefined, parser: Parser = browserParser): Promise<Uitkomst> {
+  if (b.voorstel?.eigenschap) {
+    await eigenschappen.schrijfVoorBevinding(adapter, b, antwoord);
+    return {};
+  }
   const w = wijzigingVoor(b, antwoord);
   if (!w || !b.plek) throw new Error("Deze bevinding kan de assistent niet zelf herstellen.");
   const inhoud = await adapter.leverInhoud();
@@ -124,6 +137,7 @@ export async function herstel(adapter: Adapter, b: Bevinding, antwoord: string |
  * alternatieve tekst (versiering) alleen per bevinding, bewust.
  */
 export function herstelbaar(b: Bevinding, antwoord?: string): boolean {
+  if (b.voorstel?.eigenschap) return !!(b.voorstel.eigenschap.waarde ?? antwoord)?.trim();
   if (!b.plek?.pad || !b.voorstel) return false;
   return !!b.voorstel.vervanging || (!!b.voorstel.vraag && !!antwoord?.trim());
 }
@@ -145,7 +159,10 @@ export interface UitkomstAlles extends Uitkomst {
  * ronde: de vervanging van het ouderelement is gemaakt op de oude inhoud.
  */
 export async function herstelAlles(adapter: Adapter, bevindingen: Bevinding[], antwoorden: Record<string, string> = {}, parser: Parser = browserParser): Promise<UitkomstAlles> {
-  const kandidaten = bevindingen.filter((b) => herstelbaar(b, antwoorden[b.id]));
+  // Eigenschappen eerst: die raken de inhoud niet.
+  const eigen = bevindingen.filter((b) => b.voorstel?.eigenschap && herstelbaar(b, antwoorden[b.id]));
+  for (const b of eigen) await eigenschappen.schrijfVoorBevinding(adapter, b, antwoorden[b.id]);
+  const kandidaten = bevindingen.filter((b) => !b.voorstel?.eigenschap && herstelbaar(b, antwoorden[b.id]));
   // Per plek één wijziging; binnen een ander element: de diepste eerst, de ouder later.
   const gekozen: Bevinding[] = [];
   const uitgesteld: Bevinding[] = [];
@@ -154,7 +171,7 @@ export async function herstelAlles(adapter: Adapter, bevindingen: Bevinding[], a
     if (gekozen.some((g) => g.plek!.pad === p || binnen(p, g.plek!.pad) || binnen(g.plek!.pad, p))) uitgesteld.push(b);
     else gekozen.push(b);
   }
-  if (!gekozen.length) return { hersteld: [], uitgesteld };
+  if (!gekozen.length) return { hersteld: eigen, uitgesteld };
   // Van achter naar voren in het document.
   const volgorde = (x: Bevinding, y: Bevinding) => {
     const a = indices(x.plek!.pad);
@@ -168,8 +185,8 @@ export async function herstelAlles(adapter: Adapter, bevindingen: Bevinding[], a
   const nieuw = gekozen.map((b) => ({ b, element: pasToeOp(doc, b.plek!, wijzigingVoor(b, antwoorden[b.id])!) }));
   if (adapter.vervangSegment && heeftVermogen(adapter.werkomgeving(), "segment-vervangen")) {
     for (const { b, element } of nieuw) await adapter.vervangSegment(b.plek!, element);
-    return { hersteld: gekozen, uitgesteld };
+    return { hersteld: [...eigen, ...gekozen], uitgesteld };
   }
   await adapter.vervangInhoud({ ...inhoud, data: doc.body.innerHTML });
-  return { hersteld: gekozen, uitgesteld, terugval: "Deze werkomgeving kan geen deel van het document vervangen. Het document is opnieuw geladen." };
+  return { hersteld: [...eigen, ...gekozen], uitgesteld, terugval: "Deze werkomgeving kan geen deel van het document vervangen. Het document is opnieuw geladen." };
 }

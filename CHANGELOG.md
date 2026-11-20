@@ -1,5 +1,15 @@
 # Wijzigingen
 
+## 0.13.0 — 2026-11-20
+
+**Documenteigenschappen.** Ontwerp: `oa-uitrol/docs/ontwerp/documenteigenschappen.md`.
+- Nieuw onderdeel `eigenschappen`: de titelregels in de inhoud, het lezen van de eigenschappen, de bevinding over de documenttitel (WCAG 2.2, 2.4.2), het schrijven van de metadata in de eigenschappen en het anonimiseren ervan.
+- Toegankelijkheid: de documenttitel is een bevinding met herstel. Eén regel Titel → eigenschap Titel; geen regel en geen eigenschap → vraag om de titel; meer regels Titel → eerst opruimen.
+- Metadateren: voorstellen uit de eigenschappen (titel, auteur, trefwoorden, omschrijving, taal) en uit de ingelogde medewerker (auteur). Geen titelvoorstel zolang er meer dan één regel Titel is.
+- Vastleggen schrijft de metadata in de documenteigenschappen (niet bij een persoonlijk stuk). Taalcodes worden omgezet: "dut" in de metadata is "nl" in het bestand, en omgekeerd.
+- Anonimiseren in het document: bij bevestigen ook de documenteigenschappen; de auteur wordt de naam van de organisatie.
+- oa-contract 0.13.0.
+
 ## 0.12.3 — 2026-11-20
 
 - oa-contract 0.12.0.

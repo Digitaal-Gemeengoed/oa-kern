@@ -1,3 +1,4 @@
+import { schrijfMetadata } from "./eigenschappen.js";
 import { heeftVermogen, modelVan, rolWaarden, type Aard, type Adapter, type Afdruk, type Inhoud, type Objecttype } from "@digitaalgemeengoed/oa-contract";
 import { opgeschoond } from "./metadateren.js";
 import { VerbindingsFout, type ObjectMetStaat, type Verbinding } from "./verbinding.js";
@@ -131,8 +132,11 @@ export function eigenschappenVan(object: ObjectMetStaat, type?: Objecttype): Rec
 }
 
 export async function schrijfEigenschappen(adapter: Adapter, object: ObjectMetStaat, type?: Objecttype): Promise<void> {
-  if (!adapter.schrijfDocumenteigenschap || !heeftVermogen(adapter.werkomgeving(), "eigenschap-schrijven")) return;
-  for (const [naam, waarde] of Object.entries(eigenschappenVan(object, type))) await adapter.schrijfDocumenteigenschap(naam, waarde);
+  if (adapter.schrijfDocumenteigenschap && heeftVermogen(adapter.werkomgeving(), "eigenschap-schrijven")) {
+    for (const [naam, waarde] of Object.entries(eigenschappenVan(object, type))) await adapter.schrijfDocumenteigenschap(naam, waarde);
+  }
+  // De metadata zelf: titel, auteur, trefwoorden … en de overige velden onder hun label.
+  await schrijfMetadata(adapter, object, type);
 }
 
 /** Het versienummer van het platform als documenteigenschap "Versie" (een veld in de koptekst kan het tonen). */

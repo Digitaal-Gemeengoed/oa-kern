@@ -1,3 +1,4 @@
+import { anonimiseer as anonimiseerEigenschappen } from "./eigenschappen.js";
 import {
   afgerond,
   heeftVermogen,
@@ -410,11 +411,23 @@ export async function laatStaan(
  * markering is geen voorvertoning meer, en het document wordt een nieuwe
  * versie (soort anonimisering). Het origineel lezen kan daarna alleen PPL 3.
  */
-export async function bevestigInDocument(adapter: Adapter, verbinding: Verbinding, stand: Stand, sessie: Sessie): Promise<{ stand: Stand; sessie: Sessie }> {
+export async function bevestigInDocument(adapter: Adapter, verbinding: Verbinding, stand: Stand, sessie: Sessie, organisatie?: string): Promise<{ stand: Stand; sessie: Sessie }> {
   const plekken = await adapter.leesPiiPlekken!();
   // Alles wat nog in het document staat; het platform maakt alleen de voorvertoningen definitief.
   const behouden = [...new Set(plekken.map((p) => p.plaatshouder))];
   await adapter.zetPiiDefinitief?.();
+  // Ook de documenteigenschappen: dezelfde waarden worden hun plaatshouder,
+  // en de auteur wordt de organisatie. Anders staat een naam nog in de
+  // eigenschappen van het bestand of de PDF.
+  const paren = sessie.kaarten
+    .filter((k) => k.plaatshouder && behouden.includes(k.plaatshouder) && k.waarde)
+    .map((k) => ({ van: k.waarde!, naar: k.plaatshouder! }))
+    .sort((a, b) => b.van.length - a.van.length);
+  try {
+    await anonimiseerEigenschappen(adapter, paren, organisatie);
+  } catch {
+    /* Het document zelf is geanonimiseerd; de eigenschappen volgen bij een volgende keer. */
+  }
   const { inhoud, weergave } = await teBewaren(adapter);
   const html = weergave?.formaat === "html" ? weergave.data : inhoud.formaat === "html" ? inhoud.data : "";
   const meting = meetSessie(sessie, behouden, platteTekst(html));

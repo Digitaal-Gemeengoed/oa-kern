@@ -1,4 +1,5 @@
-import { METADATAMODELLEN, rollenVan, type Bevinding, type Inhoud, type ModelId, type Objecttype, type Rol } from "@digitaalgemeengoed/oa-contract";
+import { METADATAMODELLEN, rollenVan, type Bevinding, type Documenteigenschappen, type Inhoud, type ModelId, type Objecttype, type Rol, type WieBenIk } from "@digitaalgemeengoed/oa-contract";
+import { taalUitBestand, titelRegels } from "./eigenschappen.js";
 
 /** Een invoerveld, afgeleid uit het schema van het objecttype. */
 export interface Veld {
@@ -72,21 +73,43 @@ export function velden(type: Objecttype): Veld[] {
  * Voorstellen uit de inhoud zelf. De medewerker beslist; een voorstel is
  * nooit vastgelegd zonder dat hij het ziet.
  */
-export function suggesties(inhoud: Inhoud, huidig: Record<string, unknown>, type?: Objecttype): Record<string, string> {
+export function suggesties(
+  inhoud: Inhoud,
+  huidig: Record<string, unknown>,
+  type?: Objecttype,
+  extra: { eigenschappen?: Documenteigenschappen | null; wie?: Pick<WieBenIk, "naam"> | null } = {},
+): Record<string, string> {
   const s: Record<string, string> = {};
-  const rollen = type ? rollenVan(type.schema) : { titel: "naam", taal: "taal" };
+  const rollen: Partial<Record<Rol, string>> = type ? rollenVan(type.schema) : { titel: "naam", taal: "taal" };
   const titel = rollen.titel;
   const taal = rollen.taal;
-  if (titel && inhoud.formaat === "html" && !huidig[titel]) {
-    // De eerste kop 1; in een presentatie de titel van de eerste dia.
-    const m = inhoud.data.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) ?? inhoud.data.match(/^\s*<section data-oa="dia"><h2[^>]*>([\s\S]*?)<\/h2>/i);
-    const t = m?.[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
-    if (t && t.length >= 3) s[titel] = t.slice(0, 200);
+  const eig = extra.eigenschappen?.standaard ?? {};
+  if (titel && !huidig[titel]) {
+    // Eén regel met het opmaakprofiel Titel; staan er meer, dan eerst opschonen
+    // (Toegankelijkheid). Anders de titel uit de eigenschappen, dan de eerste
+    // kop 1, en in een presentatie de titel van de eerste dia.
+    const regels = titelRegels(inhoud);
+    if (regels.length === 1) s[titel] = regels[0]!.slice(0, 200);
+    else if (regels.length === 0) {
+      const m = inhoud.formaat === "html" ? (inhoud.data.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) ?? inhoud.data.match(/^\s*<section data-oa="dia"><h2[^>]*>([\s\S]*?)<\/h2>/i)) : null;
+      const t = eig.titel?.trim() || m?.[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+      if (t && t.length >= 3) s[titel] = t.slice(0, 200);
+    }
   }
+  // Auteur: wie is ingelogd (de naam uit het identiteitsbeheer), anders de eigenschap.
+  if (rollen.auteur && !huidig[rollen.auteur]) {
+    const a = extra.wie?.naam?.trim() || eig.auteur?.trim();
+    if (a) s[rollen.auteur] = a;
+  }
+  if (rollen.trefwoorden && !huidig[rollen.trefwoorden] && eig.trefwoorden?.trim()) s[rollen.trefwoorden] = eig.trefwoorden.trim();
+  if (rollen.omschrijving && !huidig[rollen.omschrijving] && (eig.omschrijving || eig.onderwerp)?.trim()) s[rollen.omschrijving] = (eig.omschrijving || eig.onderwerp)!.trim();
   if (taal && !huidig[taal]) {
     // De standaard van het schema (bv. "dut" bij RGBZ), anders Nederlands.
     const v = type ? velden(type).find((x) => x.naam === taal) : undefined;
-    s[taal] = v?.standaard ?? (v?.opties?.includes("nl") || !v?.opties ? "nl" : v.opties[0]!);
+    // De taal uit de eigenschappen (bv. "nl-NL" → "nl"), als het model die kent.
+    const uitBestand = eig.taal ? taalUitBestand(eig.taal, v?.opties) : undefined;
+    if (uitBestand) s[taal] = uitBestand;
+    else s[taal] = v?.standaard ?? (v?.opties?.includes("nl") || !v?.opties ? "nl" : v.opties[0]!);
   }
   return s;
 }
