@@ -1,5 +1,11 @@
 # Wijzigingen
 
+## 0.15.0 — 2026-11-23
+
+- Openbaarheid (Archiefregeling 2026, art. 2.12): velden met `toonAls`; `metadateren.zichtbaar()` en `metadateren.afgeleid()` (bij een grond de langste toegestane duur, de einddatum uit de datum van het stuk plus de duur, en verborgen velden leeg). `bevindingen` en `opgeschoond` houden rekening met voorwaardelijke velden.
+- `Verbinding.zetOmgeving()`: de werkomgeving en de browser gaan mee bij elke nieuwe versie (art. 2.8).
+- oa-contract 0.15.0.
+
 ## 0.14.0 — 2026-11-23
 
 - Documenteigenschap *Organisatie*: de naam van de gemeente van het stuk (de uitgever bij openbaarmaking), na elke nieuwe versie.

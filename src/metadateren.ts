@@ -1,4 +1,4 @@
-import { METADATAMODELLEN, rollenVan, type Bevinding, type Documenteigenschappen, type Inhoud, type ModelId, type Objecttype, type Rol, type WieBenIk } from "@digitaalgemeengoed/oa-contract";
+import { beperkingsgrond, BEPERKT_OPENBAAR, einddatumBeperking, METADATAMODELLEN, ontbrekendeVelden, rollenVan, type Bevinding, type Documenteigenschappen, type Inhoud, type ModelId, type Objecttype, type Rol, type WieBenIk } from "@digitaalgemeengoed/oa-contract";
 import { taalUitBestand, titelRegels } from "./eigenschappen.js";
 
 /** Een invoerveld, afgeleid uit het schema van het objecttype. */
@@ -15,6 +15,8 @@ export interface Veld {
   opties?: string[];
   maxLengte?: number;
   standaard?: string;
+  /** Alleen tonen als dat veld deze waarde heeft (zoals de grond bij "beperkt openbaar"). */
+  toonAls?: { veld: string; waarde: string };
 }
 
 interface Eigenschap {
@@ -27,12 +29,14 @@ interface Eigenschap {
   description?: string;
   maxLength?: number;
   default?: string;
+  "x-oa-toon-als"?: { veld: string; waarde: string };
 }
 
 /** De velden van een objecttype, verplichte eerst, in de volgorde van het schema. */
 export function velden(type: Objecttype): Veld[] {
-  const s = type.schema as { properties?: Record<string, Eigenschap>; required?: string[]; "x-oa-model"?: ModelId };
-  const verplicht = new Set(s.required ?? []);
+  const s = type.schema as { properties?: Record<string, Eigenschap>; required?: string[]; "x-oa-model"?: ModelId; "x-oa-verplicht-als"?: { velden: string[] }[] };
+  // Ook wat alleen verplicht is als het getoond wordt (x-oa-verplicht-als).
+  const verplicht = new Set([...(s.required ?? []), ...(s["x-oa-verplicht-als"] ?? []).flatMap((r) => r.velden)]);
   const model = s["x-oa-model"] ?? "mdto";
   const rollen = rollenVan(type.schema);
   const lijst = Object.entries(s.properties ?? {}).map(([naam, e]): Veld => {
@@ -56,6 +60,7 @@ export function velden(type: Objecttype): Veld[] {
       opties: e.enum,
       maxLengte: e.maxLength,
       standaard: e.default,
+      ...(e["x-oa-toon-als"] ? { toonAls: e["x-oa-toon-als"] } : {}),
     };
   });
   // Een gemeente die zelf de volgorde koos (beheerportaal): die volgorde. De
@@ -114,10 +119,38 @@ export function suggesties(
   return s;
 }
 
+/** Wordt dit veld getoond bij deze metadata? */
+export const zichtbaar = (v: Pick<Veld, "toonAls">, metadata: Record<string, unknown>): boolean => !v.toonAls || metadata[v.toonAls.veld] === v.toonAls.waarde;
+
+/**
+ * Na een wijziging in het formulier: wat daaruit volgt. Bij een grond voor
+ * beperking de langste duur die artikel 7.4 toestaat (als de duur nog leeg
+ * is), en de einddatum uit de datum van het stuk (of vandaag) plus de duur.
+ * Velden die niet meer getoond worden, worden leeg.
+ */
+export function afgeleid(type: Objecttype, metadata: Record<string, string>, vandaag = new Date().toISOString().slice(0, 10)): Record<string, string> {
+  const m = { ...metadata };
+  const v = velden(type);
+  for (const x of v) if (!zichtbaar(x, m) && m[x.naam]) delete m[x.naam];
+  const r = rollenVan(type.schema);
+  const openbaarheid = r.openbaarheid ? m[r.openbaarheid] : undefined;
+  if (openbaarheid === BEPERKT_OPENBAAR && r.beperkingstermijn && !m[r.beperkingstermijn]) {
+    const g = beperkingsgrond(r.beperkingsgrond ? m[r.beperkingsgrond] : undefined);
+    if (g) m[r.beperkingstermijn] = String(g.maxJaren);
+  }
+  if (openbaarheid === BEPERKT_OPENBAAR && r.beperkingstermijn && r.beperkingEinddatum) {
+    const jaren = Number(m[r.beperkingstermijn]);
+    const eind = einddatumBeperking((r.datum && m[r.datum]) || vandaag, jaren);
+    if (eind) m[r.beperkingEinddatum] = eind;
+  }
+  return m;
+}
+
 /** Ontbrekende verplichte velden als bevindingen, zodat het paneel ze naast de rest toont. */
 export function bevindingen(type: Objecttype, metadata: Record<string, unknown>): Bevinding[] {
+  const leeg = new Set(ontbrekendeVelden(type.schema, metadata));
   return velden(type)
-    .filter((v) => v.verplicht && (metadata[v.naam] === undefined || metadata[v.naam] === ""))
+    .filter((v) => leeg.has(v.naam))
     .map((v) => ({
       id: `md-${v.naam}`,
       module: "metadateren" as const,
@@ -129,10 +162,13 @@ export function bevindingen(type: Objecttype, metadata: Record<string, unknown>)
 
 /** Alleen ingevulde waarden; lege velden gaan niet als lege tekst naar het platform. */
 export function opgeschoond(metadata: Record<string, unknown>, type?: Objecttype): Record<string, unknown> {
-  const getal = new Set(type ? velden(type).filter((v) => v.soort === "getal").map((v) => v.naam) : []);
+  const vv = type ? velden(type) : [];
+  const getal = new Set(vv.filter((v) => v.soort === "getal").map((v) => v.naam));
+  // Een veld dat niet getoond wordt (zoals de grond bij "openbaar"), gaat niet mee.
+  const verborgen = new Set(vv.filter((v) => !zichtbaar(v, metadata)).map((v) => v.naam));
   return Object.fromEntries(
     Object.entries(metadata)
-      .filter(([, w]) => w !== undefined && w !== null && w !== "")
+      .filter(([k, w]) => w !== undefined && w !== null && w !== "" && !verborgen.has(k))
       .map(([k, w]) => [k, getal.has(k) && typeof w === "string" && w.trim() !== "" && !Number.isNaN(Number(w.replace(",", "."))) ? Number(w.replace(",", ".")) : w]),
   );
 }

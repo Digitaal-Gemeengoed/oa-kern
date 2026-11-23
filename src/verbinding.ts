@@ -25,6 +25,8 @@ import {
   type Afwijking,
   type Wijzigingsvoorstel,
   type ZaakClassificatie,
+  type Omgeving,
+  type Werkomgeving,
 } from "@digitaalgemeengoed/oa-contract";
 
 /** Het classificatiemodel dat nu geldt, met de resultaten uit de selectielijst die de gemeente gebruikt. */
@@ -58,10 +60,21 @@ export class VerbindingsFout extends Error {
  * sessie zit in een httpOnly-cookie, dus hier staan geen tokens.
  */
 export class Verbinding {
+  /** Waarmee versies worden gemaakt; gaat mee bij elke nieuwe versie (Archiefregeling 2026, art. 2.8). */
+  private omgeving: Omgeving | undefined;
+
   constructor(
     private readonly basis = "",
     private readonly doeFetch: typeof fetch = (...a) => fetch(...a),
   ) {}
+
+  /** De werkomgeving (programma, versie, besturingssysteem) en de browser van het paneel. */
+  zetOmgeving(w: Werkomgeving, browser?: string): void {
+    this.omgeving = {
+      werkomgeving: { id: w.id, naam: w.naam, ...(w.versie ? { versie: w.versie } : {}), ...(w.platform ? { platform: w.platform } : {}) },
+      ...(browser ? { browser: browser.slice(0, 300) } : {}),
+    };
+  }
 
   private async vraag<T>(pad: string, init: RequestInit = {}): Promise<T> {
     let r: Response;
@@ -109,7 +122,7 @@ export class Verbinding {
     return this.vraag<ToepassenAntwoord>(LEES.anonimiserenToepassen, { method: "POST", body: JSON.stringify({ inhoud, treffers }) });
   }
   legAnonimiseringVast(id: string, nummer: number, inhoud: Inhoud, overzicht: Partial<Record<PiiSoort, number>>) {
-    return this.vraag<ObjectMetStaat>(VASTLEG.anonimisering(id, nummer), { method: "POST", body: JSON.stringify({ inhoud, overzicht }) });
+    return this.vraag<ObjectMetStaat>(VASTLEG.anonimisering(id, nummer), { method: "POST", body: JSON.stringify({ inhoud, overzicht, ...this.metOmgeving() }) });
   }
   /** Persoonsgegevens versleuteld registreren; dezelfde waarde krijgt dezelfde plaatshouder. */
   registreerPii(id: string, items: PiiInvoer[], voorvertoning = false) {
@@ -175,7 +188,7 @@ export class Verbinding {
     return this.vraag<ObjectMetStaat>(VASTLEG.onleesbaar(id), { method: "POST", body: JSON.stringify({ reden }) });
   }
   maakObject(objecttype: string, metadata: Record<string, unknown>, inhoud?: Inhoud, weergave?: Inhoud, aard?: Aard) {
-    return this.vraag<ObjectMetStaat>(VASTLEG.objecten, { method: "POST", body: JSON.stringify({ objecttype, aard, metadata, inhoud, weergave }) });
+    return this.vraag<ObjectMetStaat>(VASTLEG.objecten, { method: "POST", body: JSON.stringify({ objecttype, aard, metadata, inhoud, weergave, ...(inhoud ? this.metOmgeving() : {}) }) });
   }
   /** Zakelijk of persoonlijk; het platform staat in het prototype alleen persoonlijk naar zakelijk toe. */
   wijzigAard(id: string, aard: Aard) {
@@ -214,6 +227,10 @@ export class Verbinding {
     return this.vraag<Wijzigingsvoorstel>(VASTLEG.beoordeling(id), { method: "POST", body: JSON.stringify({ besluit, ...(toelichting ? { toelichting } : {}) }) });
   }
   voegVersieToe(id: string, inhoud: Inhoud, weergave?: Inhoud) {
-    return this.vraag<ObjectMetStaat>(VASTLEG.versies(id), { method: "POST", body: JSON.stringify({ inhoud, weergave }) });
+    return this.vraag<ObjectMetStaat>(VASTLEG.versies(id), { method: "POST", body: JSON.stringify({ inhoud, weergave, ...this.metOmgeving() }) });
+  }
+
+  private metOmgeving(): { omgeving?: Omgeving } {
+    return this.omgeving ? { omgeving: this.omgeving } : {};
   }
 }

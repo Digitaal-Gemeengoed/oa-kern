@@ -550,3 +550,29 @@ test("taalcodes gaan tussen metadata en documenteigenschap in de juiste vorm", (
   assert.equal(eig.taalUitBestand("en-GB", ["nl", "en"]), "en");
   assert.equal(eig.taalUitBestand("fy", ["dut", "eng"]), undefined);
 });
+
+test("openbaarheid (Archiefregeling 2026): grond, duur en einddatum volgen uit elkaar", async () => {
+  const c = await import("@digitaalgemeengoed/oa-contract");
+  const type = { naam: "document", versie: 2, titel: "Document", schema: c.schemaUitConfig(c.standaardConfig("mdto")) };
+  const v = metadateren.velden(type);
+  const grond = v.find((x) => x.rol === "beperkingsgrond");
+  assert.deepEqual(grond.toonAls, { veld: "openbaarheid", waarde: "beperkt openbaar" });
+  assert.equal(grond.verplicht, true);
+  assert.equal(metadateren.zichtbaar(grond, { openbaarheid: "openbaar" }), false);
+  // Beperkt openbaar met een grond: de langste duur voor die grond, en de einddatum vanaf de datum van het stuk.
+  const m = metadateren.afgeleid(type, { openbaarheid: "beperkt openbaar", beperkingsgrond: "art. 7.2 lid 2 onder e — eerbiediging van de persoonlijke levenssfeer", gebeurtenisDatum: "2026-11-23" });
+  assert.equal(m.beperkingstermijn, "110");
+  assert.equal(m.beperkingEinddatum, "2136-11-23");
+  // Een eigen kortere duur blijft staan; zonder datum telt vandaag.
+  const k = metadateren.afgeleid(type, { ...m, beperkingstermijn: "10", gebeurtenisDatum: "" }, "2026-12-01");
+  assert.equal(k.beperkingstermijn, "10");
+  assert.equal(k.beperkingEinddatum, "2036-12-01");
+  // Terug naar openbaar: de beperking verdwijnt, en gaat niet mee naar het platform.
+  const o = metadateren.afgeleid(type, { ...m, openbaarheid: "openbaar" });
+  assert.equal(o.beperkingsgrond, undefined);
+  assert.deepEqual(Object.keys(metadateren.opgeschoond({ openbaarheid: "openbaar", beperkingsgrond: "x" }, type)), ["openbaarheid"]);
+  // Ontbrekend: alleen bij beperkt openbaar.
+  const ontbreekt = (md) => metadateren.bevindingen(type, md).map((b) => b.id);
+  assert.ok(!ontbreekt({ openbaarheid: "openbaar" }).includes("md-beperkingsgrond"));
+  assert.ok(ontbreekt({ openbaarheid: "beperkt openbaar" }).includes("md-beperkingsgrond"));
+});
