@@ -120,6 +120,8 @@ export async function naVersie(adapter: Adapter, stand: Stand, object: ObjectMet
  */
 export function eigenschappenVan(object: ObjectMetStaat, type?: Objecttype): Record<string, string> {
   const uit: Record<string, string> = { Identificatie: object.identificatie };
+  // De uitgever bij openbaarmaking (Woo): de gemeente, niet de medewerker.
+  if (object.gemeenteNaam) uit.Organisatie = object.gemeenteNaam;
   const versie = object.versies.at(-1)?.nummer;
   if (versie) uit.Versie = String(versie);
   if (type && type.versie === object.objecttype.versie) {

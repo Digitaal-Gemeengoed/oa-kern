@@ -9,6 +9,7 @@ import {
   type Objecttype,
   type Rol,
   type Standaardeigenschap,
+  gemeenteNaamUitId,
 } from "@digitaalgemeengoed/oa-contract";
 import { velden } from "./metadateren.js";
 import type { ObjectMetStaat } from "./verbinding.js";
@@ -194,4 +195,4 @@ export async function anonimiseer(adapter: Adapter, paren: { van: string; naar: 
 }
 
 /** "haarlem" → "Gemeente Haarlem", als de organisatie geen eigen naam meegeeft. */
-export const organisatieNaam = (gemeente: string) => `Gemeente ${gemeente.split("-").map((d) => (d ? d[0]!.toUpperCase() + d.slice(1) : d)).join("-")}`;
+export const organisatieNaam = (gemeente: string) => gemeenteNaamUitId(gemeente);

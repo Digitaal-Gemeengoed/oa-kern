@@ -1,5 +1,11 @@
 # Wijzigingen
 
+## 0.14.0 — 2026-11-23
+
+- Documenteigenschap *Organisatie*: de naam van de gemeente van het stuk (de uitgever bij openbaarmaking), na elke nieuwe versie.
+- `eigenschappen.organisatieNaam` gebruikt `gemeenteNaamUitId` uit het contract.
+- oa-contract 0.14.0.
+
 ## 0.13.0 — 2026-11-20
 
 **Documenteigenschappen.** Ontwerp: `oa-uitrol/docs/ontwerp/documenteigenschappen.md`.
