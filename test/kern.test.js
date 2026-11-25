@@ -382,6 +382,32 @@ test("anonimiseren in het document: voorvertoning, laat staan, toevoegen, bevest
   assert.equal(r.stand.object.versies.at(-1).nummer, 2);
   assert.equal(eigenschappen.Versie, "2");
   assert.equal(plekken().some((p) => p.voorvertoning), false);
+
+  // Later heropend: de assistent herkent het geanonimiseerde document aan de plaatshouders
+  // die in het register van dit stuk staan, ook zonder voorvertoningen.
+  for (const x of register) x.status = "bevestigd";
+  const h = await anonimiseren.hervat(adapter, verbinding, r.stand);
+  assert.deepEqual(h.kaarten.map((k) => [k.plaatshouder, k.status, k.ppl, k.plekken.length]), [["[PERSOON 1]", "bevestigd", 1, 1], ["[PERSOON 2]", "bevestigd", 2, 1], ["[DATUM 1]", "bevestigd", 3, 1]]);
+  // Originelen binnen het eigen niveau (PPL 1): in één keer, de rest blijft leeg.
+  const onthul = verbinding.onthulPii;
+  let gevraagd;
+  verbinding.onthulPii = async (id, ph) => ((gevraagd = ph), onthul(id, ph));
+  const o = await anonimiseren.onthulBinnenNiveau(verbinding, r.stand, h, 1);
+  verbinding.onthulPii = onthul;
+  assert.deepEqual(gevraagd, ["[PERSOON 1]"]);
+  assert.deepEqual(o.kaarten.map((k) => k.waarde ?? null), ["Sanne de Boer", null, null]);
+  // In de tekst: alleen wat onthuld is; zonder dat vermogen kan het niet.
+  assert.equal(anonimiseren.kanOriginelenInDocument(adapter), false);
+  let getoond;
+  const metInzage = { ...adapter, toonPiiOriginelen: async (w) => ((getoond = w), 1), verbergPiiOriginelen: async () => (getoond = null) };
+  assert.equal(anonimiseren.kanOriginelenInDocument(metInzage), true);
+  assert.equal(await anonimiseren.toonOriginelenInDocument(metInzage, o), 1);
+  assert.deepEqual(getoond, [{ plaatshouder: "[PERSOON 1]", waarde: "Sanne de Boer" }]);
+  await anonimiseren.verbergOriginelen(metInzage);
+  assert.equal(getoond, null);
+  // Een document zonder plaatshouders uit dit register: niets op te pakken.
+  assert.equal(await anonimiseren.hervat({ ...adapter, leesPiiPlekken: async () => [] }, verbinding, r.stand), null);
+
   assert.equal(anonimiseren.raadSoort("06-12345678"), "telefoon");
   assert.equal(anonimiseren.raadSoort("mantelzorg aan uw moeder"), "gezondheid");
   assert.equal(anonimiseren.raadSoort("Klaas Bakker"), "naam");

@@ -1,5 +1,12 @@
 # Wijzigingen
 
+## 0.16.0 — 2026-11-25
+
+- `anonimiseren.hervat()` herkent ook een document dat al is geanonimiseerd: plaatshouders in de tekst die in het register van het stuk staan, ook zonder voorvertoningen.
+- `anonimiseren.onthulBinnenNiveau()`: de originelen van alle gegevens binnen het niveau van de gebruiker in één verzoek (het platform legt het inzien vast); gegevens boven dat niveau blijven zonder waarde.
+- `anonimiseren.kanOriginelenInDocument()`, `toonOriginelenInDocument()` en `verbergOriginelen()`.
+- oa-contract 0.16.0.
+
 ## 0.15.0 — 2026-11-23
 
 - Openbaarheid (Archiefregeling 2026, art. 2.12): velden met `toonAls`; `metadateren.zichtbaar()` en `metadateren.afgeleid()` (bij een grond de langste toegestane duur, de einddatum uit de datum van het stuk plus de duur, en verborgen velden leeg). `bevindingen` en `opgeschoond` houden rekening met voorwaardelijke velden.

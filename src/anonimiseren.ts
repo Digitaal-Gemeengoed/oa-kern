@@ -292,15 +292,53 @@ export async function vindEnMarkeer(adapter: Adapter, verbinding: Verbinding, st
   return { stand: b.stand, sessie: { bronversie: b.bronversie, kaarten: gesorteerd, motor: g.motor, standaard: g.standaard } };
 }
 
-/** Een sessie die nog loopt (voorvertoningen in het document) weer oppakken, bv. na heropenen. */
+/**
+ * De plaatshouders in het document weer oppakken, bv. na heropenen: een sessie
+ * die nog loopt (voorvertoningen), of een document dat al is geanonimiseerd
+ * (bevestigde plaatshouders die in het register van dit stuk staan).
+ */
 export async function hervat(adapter: Adapter, verbinding: Verbinding, stand: Stand): Promise<Sessie | null> {
   if (!stand.object || !kanInDocument(adapter)) return null;
   const plekken = await adapter.leesPiiPlekken!();
+  if (!plekken.length) return null;
   const register = await verbinding.piiRegister(stand.object.identificatie);
-  const voorlopig = new Set(register.registraties.filter((r) => r.status === "voorvertoning").map((r) => r.plaatshouder));
-  if (!plekken.some((p) => p.voorvertoning || voorlopig.has(p.plaatshouder))) return null;
+  const bekend = new Set(register.registraties.map((r) => r.plaatshouder));
+  if (!plekken.some((p) => p.voorvertoning || bekend.has(p.plaatshouder))) return null;
   const kaarten = register.registraties.map((r) => kaartUit(r, r.status === "voorvertoning" ? "voorvertoning" : "bevestigd", r.bron));
   return { bronversie: stand.object.versies.at(-1)!.nummer, kaarten: verdeelPlekken(kaarten, plekken).filter((k) => k.plekken.length) };
+}
+
+/**
+ * De originele waarden van alle plaatshouders die je met je niveau mag zien,
+ * in één keer uit het register (het platform legt het inzien vast). Kaarten
+ * boven je niveau blijven zonder waarde.
+ */
+export async function onthulBinnenNiveau(verbinding: Verbinding, stand: Stand, sessie: Sessie, niveau: Ppl): Promise<Sessie> {
+  if (!stand.object) return sessie;
+  const nodig = sessie.kaarten.filter((k) => k.plaatshouder && k.status !== "laat-staan" && k.ppl <= niveau && k.waarde === undefined).map((k) => k.plaatshouder!);
+  if (!nodig.length) return sessie;
+  const { waarden } = await verbinding.onthulPii(stand.object.identificatie, [...new Set(nodig)]);
+  const per = new Map(waarden.map((w) => [w.plaatshouder, w.waarde] as const));
+  return { ...sessie, kaarten: sessie.kaarten.map((k) => (k.plaatshouder && per.has(k.plaatshouder) ? { ...k, waarde: per.get(k.plaatshouder) } : k)) };
+}
+
+/** Kan de werkomgeving de originelen tijdelijk in de tekst tonen (zonder dat ze worden opgeslagen)? */
+export function kanOriginelenInDocument(adapter: Adapter): boolean {
+  return !!adapter.toonPiiOriginelen && !!adapter.verbergPiiOriginelen;
+}
+
+/** De onthulde waarden tijdelijk in de tekst; geeft het aantal plekken. */
+export async function toonOriginelenInDocument(adapter: Adapter, sessie: Sessie): Promise<number> {
+  const waarden = sessie.kaarten
+    .filter((k) => k.plaatshouder && k.waarde !== undefined && k.status !== "laat-staan")
+    .map((k) => ({ plaatshouder: k.plaatshouder!, waarde: k.waarde! }));
+  if (!waarden.length) return 0;
+  return adapter.toonPiiOriginelen!(waarden);
+}
+
+/** De plaatshouders terug in de tekst. */
+export async function verbergOriginelen(adapter: Adapter): Promise<void> {
+  await adapter.verbergPiiOriginelen?.();
 }
 
 /**
