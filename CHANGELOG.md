@@ -1,5 +1,9 @@
 # Wijzigingen
 
+## 0.16.1 — 2026-11-26
+
+- `anonimiseren.beperkTotNiveau()`: na bevestigen gaan de herkende waarden boven het niveau van de gebruiker uit de sessie, ook voor wie het stuk zelf anonimiseerde.
+
 ## 0.16.0 — 2026-11-25
 
 - `anonimiseren.hervat()` herkent ook een document dat al is geanonimiseerd: plaatshouders in de tekst die in het register van het stuk staan, ook zonder voorvertoningen.

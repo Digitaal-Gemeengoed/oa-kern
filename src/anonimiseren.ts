@@ -322,6 +322,15 @@ export async function onthulBinnenNiveau(verbinding: Verbinding, stand: Stand, s
   return { ...sessie, kaarten: sessie.kaarten.map((k) => (k.plaatshouder && per.has(k.plaatshouder) ? { ...k, waarde: per.get(k.plaatshouder) } : k)) };
 }
 
+/**
+ * Na bevestigen: wat de herkenning vond, mag je daarna alleen zien binnen je
+ * eigen niveau, ook als je het stuk zelf hebt geanonimiseerd. Waarden boven
+ * je niveau gaan uit de sessie.
+ */
+export function beperkTotNiveau(sessie: Sessie, niveau: Ppl): Sessie {
+  return { ...sessie, kaarten: sessie.kaarten.map((k) => (k.status === "bevestigd" && k.ppl > niveau && k.waarde !== undefined ? { ...k, waarde: undefined } : k)) };
+}
+
 /** Kan de werkomgeving de originelen tijdelijk in de tekst tonen (zonder dat ze worden opgeslagen)? */
 export function kanOriginelenInDocument(adapter: Adapter): boolean {
   return !!adapter.toonPiiOriginelen && !!adapter.verbergPiiOriginelen;

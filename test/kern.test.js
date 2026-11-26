@@ -383,6 +383,11 @@ test("anonimiseren in het document: voorvertoning, laat staan, toevoegen, bevest
   assert.equal(eigenschappen.Versie, "2");
   assert.equal(plekken().some((p) => p.voorvertoning), false);
 
+  // Na bevestigen: waarden boven het eigen niveau gaan uit de sessie, ook voor wie het stuk anonimiseerde.
+  const metWaarden = { ...r.sessie, kaarten: r.sessie.kaarten.map((k, i) => ({ ...k, status: "bevestigd", waarde: `w${i}` })) };
+  assert.deepEqual(anonimiseren.beperkTotNiveau(metWaarden, 1).kaarten.map((k) => [k.ppl, k.waarde ?? null]), metWaarden.kaarten.map((k, i) => [k.ppl, k.ppl <= 1 ? `w${i}` : null]));
+  assert.ok(anonimiseren.beperkTotNiveau(metWaarden, 3).kaarten.every((k) => k.waarde !== undefined));
+
   // Later heropend: de assistent herkent het geanonimiseerde document aan de plaatshouders
   // die in het register van dit stuk staan, ook zonder voorvertoningen.
   for (const x of register) x.status = "bevestigd";
